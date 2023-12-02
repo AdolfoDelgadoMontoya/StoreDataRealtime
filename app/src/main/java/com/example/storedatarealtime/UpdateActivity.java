@@ -18,51 +18,63 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
-import java.text.DateFormat;
-import java.util.Calendar;
-
-public class UploadActivity extends AppCompatActivity {
-    ImageView uploadImage;
-    Button saveButton;
-    EditText uploatTopic, uploatDesc, uploatLang;
-    String imageURL;
+public class UpdateActivity extends AppCompatActivity {
+    ImageView updateImage;
+    Button updateButton;
+    EditText updateDesc, updateTitle, updateLang;
+    String title, desc, lang, imageURL, key, oldImageURL;
     Uri uri;
+    DatabaseReference databaseReference;
+    StorageReference storageReference;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_upload);
-        uploadImage=findViewById(R.id.uploadImage);
-        uploatDesc=findViewById(R.id.uploadDesc);
-        uploatTopic=findViewById(R.id.uploadTopic);
-        uploatLang=findViewById(R.id.uploadLang);
-        saveButton=findViewById(R.id.saveButton);
+        setContentView(R.layout.activity_update);
+
+        updateButton = findViewById(R.id.updateButton);
+        updateDesc = findViewById(R.id.updateDesc);
+        updateImage = findViewById(R.id.updateImage);
+        updateLang = findViewById(R.id.updateLang);
+        updateTitle = findViewById(R.id.updateTitle);
 
         ActivityResultLauncher<Intent> activityResultLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 new ActivityResultCallback<ActivityResult>() {
                     @Override
                     public void onActivityResult(ActivityResult result) {
-                        if (result.getResultCode()== Activity.RESULT_OK){
+                        if (result.getResultCode() == Activity.RESULT_OK){
                             Intent data = result.getData();
                             uri = data.getData();
-                            uploadImage.setImageURI(uri);
+                            updateImage.setImageURI(uri);
                         }else{
-                            Toast.makeText(UploadActivity.this, "Imagen no seleccionada", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(UpdateActivity.this, "Imagen no seleccionada", Toast.LENGTH_SHORT).show();
                         }
                     }
                 }
         );
 
-        uploadImage.setOnClickListener(new View.OnClickListener() {
+        Bundle bundle = getIntent().getExtras();
+        if(bundle!=null){
+            Glide.with(UpdateActivity.this).load(bundle.getString("Image")).into(updateImage);
+            updateTitle.setText(bundle.getString("Title"));
+            updateDesc.setText(bundle.getString("Description"));
+            updateLang.setText(bundle.getString("Language"));
+            key=bundle.getString("Key");
+            oldImageURL=bundle.getString("Image");
+        }
+        databaseReference = FirebaseDatabase.getInstance().getReference("Tutoriales Android").child(key);
+        updateImage.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Intent photoPicker = new Intent(Intent.ACTION_PICK);
@@ -71,18 +83,22 @@ public class UploadActivity extends AppCompatActivity {
             }
         });
 
-        saveButton.setOnClickListener(new View.OnClickListener() {
+        updateButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 saveData();
+                Intent intent =  new Intent(UpdateActivity.this,MainActivity.class);
+                startActivity(intent);
             }
         });
     }
 
     public void saveData() {
-        StorageReference storageReference = FirebaseStorage.getInstance().getReference().child("Android Imágenes")
+        storageReference = FirebaseStorage.getInstance().getReference().child("Android Imágenes")
                 .child(uri.getLastPathSegment());
-        AlertDialog.Builder builder = new AlertDialog.Builder(UploadActivity.this);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(UpdateActivity.this);
+        builder.setCancelable(false);
         builder.setView(R.layout.progress_layout);
         AlertDialog dialog = builder.create();
         dialog.show();
@@ -92,9 +108,9 @@ public class UploadActivity extends AppCompatActivity {
             public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
                 Task<Uri> uriTask = taskSnapshot.getStorage().getDownloadUrl();
                 while (!uriTask.isComplete());
-                Uri UrlImage = uriTask.getResult();
-                imageURL = UrlImage.toString();
-                uploadData();
+                Uri urlImage = uriTask.getResult();
+                imageURL = urlImage.toString();
+                updateData();
                 dialog.dismiss();
             }
         }).addOnFailureListener(new OnFailureListener() {
@@ -105,29 +121,28 @@ public class UploadActivity extends AppCompatActivity {
         });
     }
 
-    public void uploadData() {
+    public void updateData() {
 
-        String title = uploatTopic.getText().toString();
-        String desc = uploatDesc.getText().toString();
-        String lang = uploatLang.getText().toString();
+        title = updateTitle.getText().toString().trim();
+        desc = updateDesc.getText().toString().trim();
+        lang = updateLang.getText().toString();
 
         DataClass dataClass = new DataClass(title,desc,lang,imageURL);
 
-        String currentData = DateFormat.getDateTimeInstance().format(Calendar.getInstance().getTime());
-
-        FirebaseDatabase.getInstance().getReference("Tutoriales Android").child(currentData)
-                .setValue(dataClass).addOnCompleteListener(new OnCompleteListener<Void>() {
-                    @Override
-                    public void onComplete(@NonNull Task<Void> task) {
-                        if(task.isSuccessful()){
-                            Toast.makeText(UploadActivity.this,"Guardado",Toast.LENGTH_SHORT).show();
-                            finish();
-                        }
+            databaseReference.setValue(dataClass).addOnCompleteListener(new OnCompleteListener<Void>() {
+                @Override
+                public void onComplete(@NonNull Task<Void> task) {
+                    if(task.isSuccessful()){
+                        StorageReference reference = FirebaseStorage.getInstance().getReferenceFromUrl(oldImageURL);
+                        reference.delete();
+                        Toast.makeText(UpdateActivity.this,"Actualizado",Toast.LENGTH_SHORT).show();
+                        finish();
                     }
+                }
                 }).addOnFailureListener(new OnFailureListener() {
                     @Override
                     public void onFailure(@NonNull Exception e) {
-                        Toast.makeText(UploadActivity.this,e.getMessage().toString(),Toast.LENGTH_SHORT).show();
+                        Toast.makeText(UpdateActivity.this,e.getMessage().toString(),Toast.LENGTH_SHORT).show();
                     }
                 });
     }
