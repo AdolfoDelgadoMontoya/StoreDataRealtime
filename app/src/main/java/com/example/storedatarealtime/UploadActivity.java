@@ -113,7 +113,9 @@ public class UploadActivity extends AppCompatActivity {
 
         DataClass dataClass = new DataClass(title,desc,lang,imageURL);
 
-        String currentData = DateFormat.getDateTimeInstance().format(Calendar.getInstance().getTime());
+        /*Esta fecha no es admitida como nodo padre en firebase*/
+        //String currentData = DateFormat.getDateTimeInstance().format(Calendar.getInstance().getTime());
+        String currentData = String.valueOf(System.currentTimeMillis());
 
         FirebaseDatabase.getInstance().getReference("Tutoriales Android").child(currentData)
                 .setValue(dataClass).addOnCompleteListener(new OnCompleteListener<Void>() {
